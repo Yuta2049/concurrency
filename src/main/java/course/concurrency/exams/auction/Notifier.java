@@ -8,7 +8,7 @@ public class Notifier {
     private ExecutorService executor;
 
     public Notifier() {
-        executor = Executors.newFixedThreadPool(100);
+        executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
     }
 
     public void sendOutdatedMessage(Bid bid) {
