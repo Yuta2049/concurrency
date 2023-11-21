@@ -9,15 +9,11 @@ public class AuctionOptimistic implements Auction {
 
     public AuctionOptimistic(Notifier notifier) {
         this.notifier = notifier;
+        latestBid.set(new Bid(null, null, Long.MIN_VALUE));
     }
 
     public boolean propose(Bid bid) {
-        Bid previousBid = latestBid.get();
-        if (previousBid == null) {
-            if (latestBid.compareAndSet(null, bid)) {
-                return true;
-            }
-        }
+        Bid previousBid;
 
         do {
             previousBid = latestBid.get();
