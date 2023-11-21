@@ -5,10 +5,10 @@ import java.util.concurrent.Executors;
 
 public class Notifier {
 
-    private ExecutorService executor;
+    private final ExecutorService executor;
 
     public Notifier() {
-        executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+        executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors() * 10);
     }
 
     public void sendOutdatedMessage(Bid bid) {
