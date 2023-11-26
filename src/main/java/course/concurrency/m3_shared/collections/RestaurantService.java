@@ -26,8 +26,7 @@ public class RestaurantService {
     }
 
     public Set<String> printStat() {
-        return stat.entrySet().stream()
-                .map(entry -> entry.getKey() + " - " + entry.getValue())
+        return stat.keySet().stream().map(r -> r + " - " + stat.get(r))
                 .collect(Collectors.toSet());
     }
 }
