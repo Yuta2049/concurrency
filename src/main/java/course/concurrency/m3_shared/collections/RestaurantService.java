@@ -22,7 +22,7 @@ public class RestaurantService {
     }
 
     public void addToStat(String restaurantName) {
-        stat.computeIfAbsent(restaurantName, k -> new LongAdder()).add(1L);
+        stat.computeIfAbsent(restaurantName, k -> new LongAdder()).increment();
     }
 
     public Set<String> printStat() {
