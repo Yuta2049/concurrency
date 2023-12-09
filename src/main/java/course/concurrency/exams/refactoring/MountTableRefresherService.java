@@ -66,25 +66,14 @@ public class MountTableRefresherService {
      * Refresh mount table cache of this router as well as all other routers.
      */
     public void refresh() {
+        List<MountTableRefresher> refreshThreads = routerStore.getCachedRecords().stream()
+                .map(Others.RouterState::getAdminAddress)
+                .filter(adminAddress -> !adminAddress.isBlank())        // this router has not enabled router admin.
+                .map(adminAddress -> adminAddress.contains("local") ?   // Local router's cache update does not require
+                        getRefresher("local", adminAddress) :    // RPC call, so no need for RouterClient
+                        getRefresher(adminAddress, adminAddress))
+                .collect(Collectors.toList());
 
-        List<Others.RouterState> cachedRecords = routerStore.getCachedRecords();
-        List<MountTableRefresher> refreshThreads = new ArrayList<>();
-        for (Others.RouterState routerState : cachedRecords) {
-            String adminAddress = routerState.getAdminAddress();
-            if (adminAddress == null || adminAddress.length() == 0) {
-                // this router has not enabled router admin.
-                continue;
-            }
-            if (isLocalAdmin(adminAddress)) {
-                /*
-                 * Local router's cache update does not require RPC call, so no need for
-                 * RouterClient
-                 */
-                refreshThreads.add(getRefresher("local", adminAddress));
-            } else {
-                refreshThreads.add(getRefresher(adminAddress, adminAddress));
-            }
-        }
         if (!refreshThreads.isEmpty()) {
             invokeRefresh(refreshThreads);
         }
@@ -118,10 +107,6 @@ public class MountTableRefresherService {
             log("Not all router admins updated their cache");
         }
         logResult(refreshThreads);
-    }
-
-    private boolean isLocalAdmin(String adminAddress) {
-        return adminAddress.contains("local");
     }
 
     private void logResult(List<MountTableRefresher> refreshThreads) {
