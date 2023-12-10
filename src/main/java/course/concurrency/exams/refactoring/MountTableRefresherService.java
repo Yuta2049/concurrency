@@ -1,6 +1,5 @@
 package course.concurrency.exams.refactoring;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.*;
@@ -101,9 +100,7 @@ public class MountTableRefresherService {
                         }))
                 .collect(Collectors.toList());
 
-        List<Boolean> results = cfs.stream().map(CompletableFuture::join).collect(Collectors.toList());
-
-        if (results.stream().anyMatch(Objects::isNull)) {
+        if (cfs.stream().map(CompletableFuture::join).anyMatch(Objects::isNull)) {
             log("Not all router admins updated their cache");
         }
         logResult(refreshThreads);

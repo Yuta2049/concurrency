@@ -2,7 +2,7 @@ package course.concurrency.exams.refactoring;
 
 public class MountTableRefresher {
 
-    private boolean success;
+    private volatile boolean success;
     /** Admin server on which refreshed to be invoked. */
     private final String adminAddress;
     private final Others.MountTableManager manager;
