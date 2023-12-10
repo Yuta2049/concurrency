@@ -16,7 +16,7 @@ public class AuctionStoppablePessimistic implements AuctionStoppable {
             return false;
         }
         synchronized (this) {
-            if (bid.getPrice() > latestBid.getPrice() && !auctionIsStopped) {       // Тест проходит и без повторной проверки, но на всякий случай оставила
+            if (bid.getPrice() > latestBid.getPrice() && !auctionIsStopped) {
                 notifier.sendOutdatedMessage(latestBid);
                 latestBid = bid;
                 return true;
@@ -31,6 +31,8 @@ public class AuctionStoppablePessimistic implements AuctionStoppable {
 
     public Bid stopAuction() {
         auctionIsStopped = true;
-        return latestBid;
+        synchronized (this) {
+            return latestBid;
+        }
     }
 }
