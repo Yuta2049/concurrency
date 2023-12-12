@@ -91,7 +91,7 @@ public class MountTableRefresherService {
                 .map(rt -> CompletableFuture.supplyAsync(rt::run, executorService)
                         .completeOnTimeout(null, cacheUpdateTimeout, TimeUnit.MILLISECONDS)
                         .handle((aBoolean, throwable) -> {
-                            if (throwable instanceof InterruptedException) {
+                            if (throwable.getCause() instanceof InterruptedException) {
                                 log("Mount table cache refresher was interrupted.");
                                 return null;
                             } else {

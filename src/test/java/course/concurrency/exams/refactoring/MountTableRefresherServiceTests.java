@@ -149,6 +149,37 @@ public class MountTableRefresherServiceTests {
     }
 
     @Test
+    @DisplayName("One task completed with exception")
+    public void interruptedExceptionInOneTask() {
+        // given
+        MountTableRefresherService mockedService = Mockito.spy(service);
+        List<String> addresses = List.of("123", "local6", "789", "local");
+
+        when(successManager.refresh()).thenReturn(true);
+        when(failedManager.refresh()).thenAnswer(invocation -> {
+            throw new InterruptedException();
+        });
+
+        List<Others.RouterState> states = addresses.stream()
+                .map(a -> new Others.RouterState(a)).collect(toList());
+        when(routerStore.getCachedRecords()).thenReturn(states);
+
+        // smth more
+        when(mockedService.getRefresher(anyString(), anyString()))
+                .thenReturn(new MountTableRefresher(failedManager, returnsSecondArg().toString()))
+                .thenReturn(new MountTableRefresher(successManager, returnsSecondArg().toString()));
+
+        // when
+        mockedService.refresh();
+
+        // then
+        verify(mockedService).log("Mount table cache refresher was interrupted.");
+        verify(mockedService).log("Not all router admins updated their cache");
+        verify(mockedService).log("Mount table entries cache refresh successCount=3,failureCount=1");
+        verify(routerClientsCache, times(1)).invalidate(anyString());
+    }
+
+    @Test
     @DisplayName("One task exceeds timeout")
     public void oneTaskExceedTimeout() throws InterruptedException {
         // given
@@ -156,7 +187,7 @@ public class MountTableRefresherServiceTests {
         List<String> addresses = List.of("123", "local6", "789", "local");
 
         when(successManager.refresh()).thenReturn(true);
-        doAnswer( new AnswersWithDelay( 5000,  new Returns(true)) ).when(failedManager).refresh();
+        doAnswer(new AnswersWithDelay(5000, new Returns(true))).when(failedManager).refresh();
 
         List<Others.RouterState> states = addresses.stream()
                 .map(a -> new Others.RouterState(a)).collect(toList());
