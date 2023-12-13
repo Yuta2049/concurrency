@@ -89,15 +89,7 @@ public class MountTableRefresherService {
     private void invokeRefresh(List<MountTableRefresher> refreshThreads) {
         List<CompletableFuture<Boolean>> cfs = refreshThreads.stream()
                 .map(rt -> CompletableFuture.supplyAsync(rt::run, executorService)
-                        .completeOnTimeout(null, cacheUpdateTimeout, TimeUnit.MILLISECONDS)
-                        .handle((aBoolean, throwable) -> {
-                            if (throwable.getCause() instanceof InterruptedException) {
-                                log("Mount table cache refresher was interrupted.");
-                                return null;
-                            } else {
-                                return aBoolean;
-                            }
-                        }))
+                        .completeOnTimeout(null, cacheUpdateTimeout, TimeUnit.MILLISECONDS))
                 .collect(Collectors.toList());
 
         if (cfs.stream().map(CompletableFuture::join).anyMatch(Objects::isNull)) {
