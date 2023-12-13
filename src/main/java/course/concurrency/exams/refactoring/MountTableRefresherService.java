@@ -89,7 +89,8 @@ public class MountTableRefresherService {
     private void invokeRefresh(List<MountTableRefresher> refreshThreads) {
         List<CompletableFuture<Boolean>> cfs = refreshThreads.stream()
                 .map(rt -> CompletableFuture.supplyAsync(rt::run, executorService)
-                        .completeOnTimeout(null, cacheUpdateTimeout, TimeUnit.MILLISECONDS))
+                        .completeOnTimeout(null, cacheUpdateTimeout, TimeUnit.MILLISECONDS)
+                        .exceptionally(ex -> null))
                 .collect(Collectors.toList());
 
         if (cfs.stream().map(CompletableFuture::join).anyMatch(Objects::isNull)) {
