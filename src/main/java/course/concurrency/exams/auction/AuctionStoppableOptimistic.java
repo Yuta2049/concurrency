@@ -1,40 +1,41 @@
 package course.concurrency.exams.auction;
 
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicMarkableReference;
 
 public class AuctionStoppableOptimistic implements AuctionStoppable {
 
     private final Notifier notifier;
-    private final AtomicReference<Bid> latestBid = new AtomicReference<>();
-    private volatile boolean auctionIsStopped = false;
+    private final AtomicMarkableReference<Bid> latestBid =
+            new AtomicMarkableReference<>(new Bid(null, null, Long.MIN_VALUE), false);
 
     public AuctionStoppableOptimistic(Notifier notifier) {
         this.notifier = notifier;
-        latestBid.set(new Bid(null, null, Long.MIN_VALUE));
     }
 
     public boolean propose(Bid bid) {
         Bid previousBid;
         do {
-            previousBid = latestBid.get();
-            if (bid.getPrice() <= previousBid.getPrice() || auctionIsStopped) {
+            previousBid = latestBid.getReference();
+            if (bid.getPrice() <= previousBid.getPrice() || latestBid.isMarked()) {
                 return false;
             }
-        } while (!auctionIsStopped && !latestBid.compareAndSet(previousBid, bid));
-        if (!auctionIsStopped) {
-            notifier.sendOutdatedMessage(previousBid);
-            return true;
-        } else {
-            return false;
-        }
+        } while (!latestBid.compareAndSet(previousBid, bid, false, false));
+        notifier.sendOutdatedMessage(previousBid);
+        return true;
     }
 
     public Bid getLatestBid() {
-        return latestBid.get();
+        return latestBid.getReference();
     }
 
     public Bid stopAuction() {
-        auctionIsStopped = true;
-        return latestBid.get();
+        Bid latest;
+        do {
+            if (latestBid.isMarked()) {
+                return latestBid.getReference();
+            }
+            latest = latestBid.getReference();
+        } while (!latestBid.compareAndSet(latest, latest, false, true));
+        return latestBid.getReference();
     }
 }
