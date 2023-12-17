@@ -3,7 +3,8 @@ package course.concurrency.m6_other;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import java.util.*;
+import java.util.List;
+import java.util.Queue;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
@@ -80,33 +81,44 @@ public class BlockingQueueTests {
         Thread thread = new Thread(queue::dequeue);
         thread.start();
 
+        // Проверяем, что поток заблокировался на пустой очереди
         Thread.sleep(50);
         assertEquals(Thread.State.WAITING, thread.getState());
+
+        // Проверяем, что поток разблокировался и завершился при добавлении элемента
+        queue.enqueue(1);
+        Thread.sleep(50);
+        assertEquals(Thread.State.TERMINATED, thread.getState());
     }
 
     @Test
     @DisplayName("Queue returns all elements")
     void canReturnAllElements() throws InterruptedException {
         int elemQuantity = 1_000_000;
+        int batchSize = 1_000;
         CountDownLatch latch = new CountDownLatch(1);
         ExecutorService executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
         BlockingQueue<Integer> queue = new BlockingQueue<>(1000);
         Queue<Integer> resultList = new ConcurrentLinkedQueue<>();
 
         // Добавляем элементы
-        for (int i = 0; i < elemQuantity; i++) {
+        for (int i = 0; i < elemQuantity; i = i + batchSize) {
             int finalI = i;
             executorService.submit(() -> {
                 try {
                     latch.await();
                 } catch (InterruptedException ex) {/* do nothing */}
-                queue.enqueue(finalI);
+                for (int j = finalI; j < finalI + batchSize; j++) {
+                    queue.enqueue(j);
+                }
             });
             executorService.submit(() -> {
                 try {
                     latch.await();
                 } catch (InterruptedException ex) {/* do nothing */}
-                resultList.add(queue.dequeue());
+                for (int j = 0; j < batchSize; j++) {
+                    resultList.add(queue.dequeue());
+                }
             });
         }
         latch.countDown();
