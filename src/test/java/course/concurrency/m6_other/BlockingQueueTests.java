@@ -8,6 +8,7 @@ import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 
 public class BlockingQueueTests {
@@ -87,40 +88,38 @@ public class BlockingQueueTests {
     @DisplayName("Queue returns all elements")
     void canReturnAllElements() throws InterruptedException {
         int elemQuantity = 1_000_000;
-
         CountDownLatch latch = new CountDownLatch(1);
+        ExecutorService executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
         BlockingQueue<Integer> queue = new BlockingQueue<>(1000);
-        Map<Integer, Integer> resultMap = new ConcurrentHashMap<>();
-
-        ExecutorService executorService1 = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+        Queue<Integer> resultList = new ConcurrentLinkedQueue<>();
 
         // Добавляем элементы
         for (int i = 0; i < elemQuantity; i++) {
             int finalI = i;
-            executorService1.submit(() -> {
+            executorService.submit(() -> {
                 try {
                     latch.await();
                 } catch (InterruptedException ex) {/* do nothing */}
                 queue.enqueue(finalI);
             });
-            executorService1.submit(() -> {
+            executorService.submit(() -> {
                 try {
                     latch.await();
                 } catch (InterruptedException ex) {/* do nothing */}
-                resultMap.put(queue.dequeue(), 1);
+                resultList.add(queue.dequeue());
             });
         }
-
         latch.countDown();
 
         // Ждем, пока потоки отбегут
-        executorService1.awaitTermination(1000, TimeUnit.MILLISECONDS);
+        executorService.shutdown();
+        assertTrue(executorService.awaitTermination(5000, TimeUnit.MILLISECONDS));
 
         // Проверяем, что элементы не потерялись
-        assertEquals(elemQuantity, resultMap.size());
-        List<Integer> resultList = new ArrayList<>(resultMap.keySet()).stream().sorted().collect(Collectors.toList());
+        assertEquals(elemQuantity, resultList.size());
+        List<Integer> sortedList = resultList.stream().sorted().collect(Collectors.toList());
         for (int i = 0; i < elemQuantity; i++) {
-            assertEquals(i, resultList.get(i));
+            assertEquals(i, sortedList.get(i));
         }
     }
 }
