@@ -3,12 +3,9 @@ package course.concurrency.m6_other;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -32,81 +29,100 @@ public class BlockingQueueTests {
     @DisplayName("Queue doesn't enqueue elements after max size")
     void canEnqueueAndBlockedOnMaxSize() throws InterruptedException {
         BlockingQueue<Integer> queue = new BlockingQueue<>(10);
-        ExecutorService executorService = Executors.newFixedThreadPool(2);
 
         //Отправляем в очередь 11 элементов в другом потоке
-        executorService.submit(() -> {
-            for (int i = 0; i < 11; i++) {
-                queue.enqueue(i);
-            }
+        Thread addingThread = new Thread(() -> {
+            for (int i = 0; i < 11; i++) queue.enqueue(i);
         });
-        Thread.sleep(100);
+        addingThread.start();
+        Thread.sleep(50);
 
         // Проверяем, что добавилось только 10 элементов
         assertEquals(10, queue.size());
 
-        // Вынимаем первый
-        assertEquals(0, queue.dequeue());
-        Thread.sleep(100);
+        // Проверяем, что добавляющий поток заблокировался
+        assertEquals(Thread.State.WAITING, addingThread.getState());
+
+        // Вынимаем первый элемент из очереди
+        queue.dequeue();
+        Thread.sleep(50);
 
         //Проверяем, что в очереди все равно 10 элементов
         assertEquals(10, queue.size());
+        Thread.sleep(50);
 
-        for (int i = 1; i < 10; i++) {
-            assertEquals(i, queue.dequeue());
-        }
+        // Проверяем, что добавляющий поток завершился
+        assertEquals(Thread.State.TERMINATED, addingThread.getState());
     }
 
     @Test
     @DisplayName("Queue returns elements in FIFO order")
-    void elementsReturnsInFIFOOrder() throws InterruptedException {
+    void elementsReturnsInFIFOOrder() {
 
-        List<Integer> list = new ArrayList<>();
         BlockingQueue<Integer> queue = new BlockingQueue<>(10);
-        ExecutorService executorService = Executors.newFixedThreadPool(2);
+        //Добавляем элементы
+        new Thread(() -> {
+            for (int i = 0; i < 20; i++) queue.enqueue(i);
+        }).start();
 
-        // Отправляем 20 элементов в другом потоке
-        executorService.submit(() -> {
-            for (int i = 0; i < 20; i++) {
-                queue.enqueue(i);
-            }
-        });
-
-        // Проверяем, что добавилось только 10 элементов
-        Thread.sleep(100);
-        assertEquals(10, queue.size());
-
-        // Вынимаем элементы, проверяем порядок
+        // Вынимаем элементы, проверяя порядок
         for (int i = 0; i < 20; i++) {
             assertEquals(i, queue.dequeue());
         }
     }
 
     @Test
+    @DisplayName("Thread will be blocked if queue is empty")
+    void ThreadWillBlockIfQueueIsEmpty() throws InterruptedException {
+
+        BlockingQueue<Integer> queue = new BlockingQueue<>(10);
+        Thread thread = new Thread(queue::dequeue);
+        thread.start();
+
+        Thread.sleep(50);
+        assertEquals(Thread.State.WAITING, thread.getState());
+    }
+
+    @Test
     @DisplayName("Queue returns all elements")
     void canReturnAllElements() throws InterruptedException {
         int elemQuantity = 1_000_000;
-        BlockingQueue<Integer> queue = new BlockingQueue<>(1000);
 
-        Map<Integer, Integer> sourceMap = new ConcurrentHashMap<>();
+        CountDownLatch latch = new CountDownLatch(1);
+        BlockingQueue<Integer> queue = new BlockingQueue<>(1000);
         Map<Integer, Integer> resultMap = new ConcurrentHashMap<>();
 
-        ExecutorService executorService1 = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors() / 2);
-        ExecutorService executorService2 = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors() / 2);
+        ExecutorService executorService1 = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors()/2);
+        ExecutorService executorService2 = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors()/2);
 
         // Добавляем элементы
         for (int i = 0; i < elemQuantity; i++) {
-            sourceMap.put(i, 1);
             int finalI = i;
-            executorService1.submit(() -> queue.enqueue(finalI));
+            executorService1.submit(() -> {
+                try {
+                    latch.await();
+                } catch (InterruptedException ex) {/* do nothing */}
+                queue.enqueue(finalI);
+            });
+            executorService2.submit(() -> {
+                try {
+                    latch.await();
+                } catch (InterruptedException ex) {/* do nothing */}
+                resultMap.put(queue.dequeue(), 1);
+            });
         }
 
+        latch.countDown();
+
+        // Ждем, пока потоки отбегут
+        executorService1.awaitTermination(500, TimeUnit.MILLISECONDS);
+        executorService2.awaitTermination(500, TimeUnit.MILLISECONDS);
+
+        // Проверяем, что элементы не потерялись
+        assertEquals(elemQuantity, resultMap.size());
+        List<Integer> resultList = new ArrayList<>(resultMap.keySet()).stream().sorted().collect(Collectors.toList());
         for (int i = 0; i < elemQuantity; i++) {
-            sourceMap.put(i, 1);
-            executorService2.submit(() -> resultMap.put(queue.dequeue(), 1));
+            assertEquals(i, resultList.get(i));
         }
-
-        Thread.sleep(1000);
-        assertEquals(sourceMap.keySet(), resultMap.keySet());
     }
 }
