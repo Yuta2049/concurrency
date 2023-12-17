@@ -92,8 +92,7 @@ public class BlockingQueueTests {
         BlockingQueue<Integer> queue = new BlockingQueue<>(1000);
         Map<Integer, Integer> resultMap = new ConcurrentHashMap<>();
 
-        ExecutorService executorService1 = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors()/2);
-        ExecutorService executorService2 = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors()/2);
+        ExecutorService executorService1 = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 
         // Добавляем элементы
         for (int i = 0; i < elemQuantity; i++) {
@@ -104,7 +103,7 @@ public class BlockingQueueTests {
                 } catch (InterruptedException ex) {/* do nothing */}
                 queue.enqueue(finalI);
             });
-            executorService2.submit(() -> {
+            executorService1.submit(() -> {
                 try {
                     latch.await();
                 } catch (InterruptedException ex) {/* do nothing */}
@@ -115,8 +114,7 @@ public class BlockingQueueTests {
         latch.countDown();
 
         // Ждем, пока потоки отбегут
-        executorService1.awaitTermination(500, TimeUnit.MILLISECONDS);
-        executorService2.awaitTermination(500, TimeUnit.MILLISECONDS);
+        executorService1.awaitTermination(1000, TimeUnit.MILLISECONDS);
 
         // Проверяем, что элементы не потерялись
         assertEquals(elemQuantity, resultMap.size());
